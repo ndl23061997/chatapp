@@ -1,10 +1,8 @@
-var io = require('socket.io').listen(3000);
+var io = require('socket.io').listen(8000);
 var db = require('./database');
 
 // Mảng lưu các user đã đăng nhập
 var listLogined = [];
-listLogined.push("admin2");
-listLogined.push('admin3');
 
 io.sockets.on('connection', (socket) => {
     console.log('co nguoi ket noi!');
@@ -13,19 +11,21 @@ io.sockets.on('connection', (socket) => {
     socket.on('user_login', (username, password) => {
         var index =  listLogined.indexOf(username);
         if(index > -1) {
-            io.sockets.emit('login_acept', { login: false , des : "Tài khoản đã đăng nhập trước ở máy khác"});
+            
+            socket.emit('login_acept', { login: false , des : "Tài khoản đã đăng nhập trước ở máy khác"});
             return;
         }
         db.Account.find({username : username, password : password} , (err, docs) => {
             if(err) throw Error;
             console.log(docs);
             if(docs.length > 0) {
-                io.sockets.emit('login_acept', { login: true , des : "Login thành công" });
+                socket.emit('login_acept', { login: true , des : "Login thành công" }, username);
+                io.emit('member_login', { login: true , des : "Login thành công" }, username);
                 listLogined.push(username);
                 console.log(username + " logined");
                 socket.username = username;
             } else {
-                io.sockets.emit('login_acept', { login: false , des : "Tài khoản hoặc mật khẩu không chính xác"});
+                socket.emit('login_acept', { login: false , des : "Tài khoản hoặc mật khẩu không chính xác"});
                 console.log(username + ' Login fail');
             }
         });
@@ -57,12 +57,12 @@ io.sockets.on('connection', (socket) => {
 
     // NGười dùng đăng xuất
     socket.on('user_logout', (username) => {
-        console.log(username + ' logout');
         var index = listLogined.indexOf(username);
         if(index > -1) {
             listLogined.splice(index, 1);
             console.log(username + ' logout');
             socket.emit('logout_result', "ok");
+            io.emit('member_logout', username);
         }
         
     });
@@ -74,19 +74,19 @@ io.sockets.on('connection', (socket) => {
     });
 
     socket.on('disconnect', ()=> {
-        console.log(socket.username + "logout");
         var index = listLogined.indexOf(socket.username);
         if(index > -1) {
             listLogined.splice(index, 1);
             console.log(socket.username + ' logout');
             socket.emit('logout_result', "ok");
+            io.emit('member_logout', socket.username);
         } 
     });
 
     // Client Gui tin nhan
     socket.on('client_send_to_all', (username, message) => {
         console.log(username + " : " + message);
-        io.to().emit('server_send_to_all', username, message);
+        io.emit('server_send_to_all', username, message);
     });
 });
 
