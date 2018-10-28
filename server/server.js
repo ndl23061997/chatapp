@@ -1,9 +1,11 @@
 var io = require('socket.io').listen(8000);
 var db = require('./database');
+var express = require('express');
 
 // Mảng lưu các user đã đăng nhập
 var listLogined = [];
-
+listLogined.push("member1");
+listLogined.push("member2");
 io.sockets.on('connection', (socket) => {
     console.log('co nguoi ket noi!');
 
@@ -11,16 +13,16 @@ io.sockets.on('connection', (socket) => {
     socket.on('user_login', (username, password) => {
         var index =  listLogined.indexOf(username);
         if(index > -1) {
-            
             socket.emit('login_acept', { login: false , des : "Tài khoản đã đăng nhập trước ở máy khác"});
             return;
         }
         db.Account.find({username : username, password : password} , (err, docs) => {
             if(err) throw Error;
-            console.log(docs);
+            // bien docs tra ve 1 mang
+            // kiem tra xem co phan tu nao trong mang ket qua khong
             if(docs.length > 0) {
                 socket.emit('login_acept', { login: true , des : "Login thành công" }, username);
-                io.emit('member_login', { login: true , des : "Login thành công" }, username);
+                io.sockets.emit('member_login', username);
                 listLogined.push(username);
                 console.log(username + " logined");
                 socket.username = username;
@@ -70,6 +72,7 @@ io.sockets.on('connection', (socket) => {
     // client lấy danh sách thành viên đang online
     socket.on('get_user_online', ()=> {
         console.log(socket.username + " get list user online");
+        console.log(listLogined.toString());
         socket.emit('rs_get_user_online', listLogined.toString());
     });
 
@@ -79,14 +82,14 @@ io.sockets.on('connection', (socket) => {
             listLogined.splice(index, 1);
             console.log(socket.username + ' logout');
             socket.emit('logout_result', "ok");
-            io.emit('member_logout', socket.username);
+            io.sockets.emit('member_logout', socket.username);
         } 
     });
 
     // Client Gui tin nhan
     socket.on('client_send_to_all', (username, message) => {
         console.log(username + " : " + message);
-        io.emit('server_send_to_all', username, message);
+        io.sockets.emit('server_send_to_all', username, message);
     });
 });
 
